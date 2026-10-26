@@ -76,13 +76,14 @@ export function generateThermalReceiptHtml(saleOrCart, settings = {}) {
     const name = item.productName || item.name || 'Item';
     const qty = item.quantity || 1;
     const price = item.price || 0;
-    const lineTotal = price * qty;
+    const itemDiscount = Number(item.discount || 0);
+    const lineTotal = Math.max(0, price * qty - itemDiscount);
 
     return `
       <div style="margin-bottom: 3px;">
         <div class="item-name">${name}</div>
         <div class="item-details">
-          <span>  ${qty} x ${formatCurrencyValue(price, settings)}</span>
+          <span>  ${qty} x ${formatCurrencyValue(price, settings)}${itemDiscount > 0 ? ` (-${formatCurrencyValue(itemDiscount, settings)})` : ''}</span>
           <span class="bold">${formatCurrencyValue(lineTotal, settings)}</span>
         </div>
       </div>
@@ -132,7 +133,7 @@ export function generateThermalReceiptHtml(saleOrCart, settings = {}) {
 
     ${discount > 0 ? `
     <div class="totals-row">
-      <span>Discount:</span>
+      <span>${saleOrCart.discount_reason || saleOrCart.discountReason ? `Discount (${saleOrCart.discount_reason || saleOrCart.discountReason}):` : 'Discount:'}</span>
       <span>-${formatCurrencyValue(discount, settings)}</span>
     </div>
     ` : ''}

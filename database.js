@@ -27,6 +27,15 @@ const DEFAULT_SETTINGS = {
   receipt_header: 'TAX INVOICE / RECEIPT',
   receipt_footer: 'Thank you for your business. Please retain receipt for returns.',
   low_stock_threshold: '5',
+  max_discount_percent: '50',
+  discount_presets: JSON.stringify([
+    { name: 'Member Discount', type: 'percentage', value: 5, code: 'MEMBER5' },
+    { name: 'Seasonal Sale', type: 'percentage', value: 10, code: 'SAVE10' },
+    { name: 'Staff Discount', type: 'percentage', value: 15, code: 'STAFF15' },
+    { name: 'Clearance', type: 'percentage', value: 20, code: 'CLEAR20' },
+    { name: 'VIP Customer', type: 'percentage', value: 25, code: 'VIP25' },
+    { name: 'Voucher $5 Off', type: 'fixed', value: 5, code: 'VOUCHER5' },
+  ]),
   thermal_printer_name: '',
   thermal_paper_width: '80mm',
   thermal_silent_print: 'false',
@@ -84,6 +93,9 @@ class PosDatabase {
         subtotal REAL DEFAULT 0,
         tax REAL DEFAULT 0,
         discount REAL DEFAULT 0,
+        discount_type TEXT DEFAULT 'fixed',
+        discount_rate REAL DEFAULT 0,
+        discount_reason TEXT,
         notes TEXT,
         status TEXT DEFAULT 'completed',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -95,7 +107,8 @@ class PosDatabase {
         product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
         product_name TEXT NOT NULL,
         quantity INTEGER NOT NULL CHECK (quantity > 0),
-        price REAL NOT NULL CHECK (price >= 0)
+        price REAL NOT NULL CHECK (price >= 0),
+        discount REAL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS customers (
@@ -211,11 +224,41 @@ class PosDatabase {
     if (!salesCols.includes('discount')) {
       this.db.exec("ALTER TABLE sales ADD COLUMN discount REAL DEFAULT 0");
     }
+    if (!salesCols.includes('discount_type')) {
+      this.db.exec("ALTER TABLE sales ADD COLUMN discount_type TEXT DEFAULT 'fixed'");
+    }
+    if (!salesCols.includes('discount_rate')) {
+      this.db.exec("ALTER TABLE sales ADD COLUMN discount_rate REAL DEFAULT 0");
+    }
+    if (!salesCols.includes('discount_reason')) {
+      this.db.exec("ALTER TABLE sales ADD COLUMN discount_reason TEXT");
+    }
     if (!salesCols.includes('status')) {
       this.db.exec("ALTER TABLE sales ADD COLUMN status TEXT DEFAULT 'completed'");
     }
     if (!salesCols.includes('notes')) {
       this.db.exec("ALTER TABLE sales ADD COLUMN notes TEXT");
+    }
+
+    // Safely add missing columns to existing sale_items table
+    const saleItemCols = this.db.prepare("PRAGMA table_info(sale_items)").all().map(c => c.name);
+    if (!saleItemCols.includes('discount')) {
+      this.db.exec("ALTER TABLE sale_items ADD COLUMN discount REAL DEFAULT 0");
+    }
+
+    // Safely add missing discount columns to held_orders table
+    const heldCols = this.db.prepare("PRAGMA table_info(held_orders)").all().map(c => c.name);
+    if (!heldCols.includes('discount')) {
+      this.db.exec("ALTER TABLE held_orders ADD COLUMN discount REAL DEFAULT 0");
+    }
+    if (!heldCols.includes('discount_type')) {
+      this.db.exec("ALTER TABLE held_orders ADD COLUMN discount_type TEXT DEFAULT 'fixed'");
+    }
+    if (!heldCols.includes('discount_rate')) {
+      this.db.exec("ALTER TABLE held_orders ADD COLUMN discount_rate REAL DEFAULT 0");
+    }
+    if (!heldCols.includes('discount_reason')) {
+      this.db.exec("ALTER TABLE held_orders ADD COLUMN discount_reason TEXT");
     }
   }
 
@@ -556,6 +599,9 @@ class PosDatabase {
 
       const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const discount = Number(sale.discount || 0);
+      const discountType = String(sale.discountType || sale.discount_type || 'fixed');
+      const discountRate = Number(sale.discountRate || sale.discount_rate || 0);
+      const discountReason = sale.discountReason || sale.discount_reason ? String(sale.discountReason || sale.discount_reason) : null;
       const discountedSubtotal = Math.max(0, subtotal - discount);
 
       // Determine tax rate
@@ -577,9 +623,9 @@ class PosDatabase {
       const notes = sale.notes ? String(sale.notes) : null;
 
       const saleResult = this.db.prepare(`
-        INSERT INTO sales (total, payment_method, customer_id, customer_name, subtotal, tax, discount, notes, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
-      `).run(total, paymentMethod, customerId, customerName, subtotal, taxAmount, discount, notes, createdAt);
+        INSERT INTO sales (total, payment_method, customer_id, customer_name, subtotal, tax, discount, discount_type, discount_rate, discount_reason, notes, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+      `).run(total, paymentMethod, customerId, customerName, subtotal, taxAmount, discount, discountType, discountRate, discountReason, notes, createdAt);
 
       const saleId = Number(saleResult.lastInsertRowid);
 
@@ -608,8 +654,8 @@ class PosDatabase {
       }
 
       const insertItem = this.db.prepare(`
-        INSERT INTO sale_items (sale_id, product_id, product_name, quantity, price)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sale_items (sale_id, product_id, product_name, quantity, price, discount)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
       const decreaseStock = this.db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
       const recordMovement = this.db.prepare(`
@@ -618,7 +664,7 @@ class PosDatabase {
       `);
 
       for (const item of items) {
-        insertItem.run(saleId, item.productId, item.productName, item.quantity, item.price);
+        insertItem.run(saleId, item.productId, item.productName, item.quantity, item.price, 0);
         decreaseStock.run(item.quantity, item.productId);
         recordMovement.run(item.productId, -item.quantity, `Sale #${saleId}`, `Sale via ${paymentMethod}`, createdAt);
       }
@@ -629,6 +675,9 @@ class PosDatabase {
         subtotal,
         tax: taxAmount,
         discount,
+        discount_type: discountType,
+        discount_rate: discountRate,
+        discount_reason: discountReason,
         payment_method: paymentMethod,
         customer_id: customerId,
         customer_name: customerName,
@@ -693,12 +742,13 @@ class PosDatabase {
   getSales() {
     const sales = this.db.prepare(`
       SELECT s.id, s.total, s.payment_method, s.customer_id, s.customer_name, 
-             s.subtotal, s.tax, s.discount, s.status, s.notes, s.created_at
+             s.subtotal, s.tax, s.discount, s.discount_type, s.discount_rate, s.discount_reason,
+             s.status, s.notes, s.created_at
       FROM sales s
       ORDER BY s.created_at DESC, s.id DESC
     `).all();
     const itemsStatement = this.db.prepare(`
-      SELECT product_id AS productId, product_name AS name, product_name AS productName, quantity, price
+      SELECT product_id AS productId, product_name AS name, product_name AS productName, quantity, price, discount
       FROM sale_items WHERE sale_id = ? ORDER BY id
     `);
     return sales.map(sale => ({ ...sale, items: itemsStatement.all(sale.id) }));
@@ -708,12 +758,13 @@ class PosDatabase {
     if (!Number.isInteger(id)) return null;
     const sale = this.db.prepare(`
       SELECT s.id, s.total, s.payment_method, s.customer_id, s.customer_name, 
-             s.subtotal, s.tax, s.discount, s.status, s.notes, s.created_at
+             s.subtotal, s.tax, s.discount, s.discount_type, s.discount_rate, s.discount_reason,
+             s.status, s.notes, s.created_at
       FROM sales s WHERE s.id = ?
     `).get(id);
     if (!sale) return null;
     sale.items = this.db.prepare(`
-      SELECT product_id AS productId, product_name AS name, product_name AS productName, quantity, price
+      SELECT product_id AS productId, product_name AS name, product_name AS productName, quantity, price, discount
       FROM sale_items WHERE sale_id = ? ORDER BY id
     `).all(id);
     return sale;
@@ -730,7 +781,8 @@ class PosDatabase {
   getStats() {
     const today = new Date().toISOString().slice(0, 10);
     const sales = this.db.prepare(`
-      SELECT COUNT(*) AS todaySalesCount, COALESCE(SUM(total), 0) AS todayTotal
+      SELECT COUNT(*) AS todaySalesCount, COALESCE(SUM(total), 0) AS todayTotal,
+             COALESCE(SUM(discount), 0) AS todayDiscounts
       FROM sales WHERE substr(created_at, 1, 10) = ? AND (status IS NULL OR status != 'refunded')
     `).get(today);
     const products = this.db.prepare(`
@@ -747,21 +799,23 @@ class PosDatabase {
       FROM customers
     `).get();
     const totalSales = this.db.prepare(`
-      SELECT COUNT(*) AS totalCount, COALESCE(SUM(total), 0) AS allTimeTotal 
+      SELECT COUNT(*) AS totalCount, COALESCE(SUM(total), 0) AS allTimeTotal,
+             COALESCE(SUM(discount), 0) AS allTimeDiscounts
       FROM sales WHERE status IS NULL OR status != 'refunded'
     `).get();
 
     const todayProfit = this.db.prepare(`
-      SELECT COALESCE(SUM(si.quantity * (si.price - COALESCE(p.cost_price, 0))), 0) AS grossProfit
+      SELECT COALESCE(SUM(si.quantity * (si.price - COALESCE(p.cost_price, 0))), 0) - COALESCE((SELECT SUM(discount) FROM sales WHERE substr(created_at, 1, 10) = ? AND (status IS NULL OR status != 'refunded')), 0) AS grossProfit
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN products p ON si.product_id = p.id
       WHERE substr(s.created_at, 1, 10) = ? AND (s.status IS NULL OR s.status != 'refunded')
-    `).get(today);
+    `).get(today, today);
 
     return {
       todaySalesCount: Number(sales.todaySalesCount),
       todayTotal: Number(sales.todayTotal),
+      todayDiscounts: Number(sales.todayDiscounts || 0),
       totalProducts: Number(products.totalProducts),
       lowStockCount: Number(products.lowStockCount || 0),
       todayGrossProfit: Number(todayProfit.grossProfit || 0),
@@ -772,6 +826,7 @@ class PosDatabase {
       debtorsCount: Number(customerLoans?.debtorsCount || 0),
       allTimeTotalRevenue: Number(totalSales.allTimeTotal || 0),
       allTimeOrdersCount: Number(totalSales.totalCount || 0),
+      allTimeDiscounts: Number(totalSales.allTimeDiscounts || 0),
     };
   }
 
@@ -1059,15 +1114,26 @@ class PosDatabase {
     return rows.map(r => ({ ...r, items: JSON.parse(r.items_json) }));
   }
 
-  saveHeldOrder({ reference, customerName, items, total, notes }) {
+  saveHeldOrder({ reference, customerName, items, total, notes, discount = 0, discountType = 'fixed', discountRate = 0, discountReason = null }) {
     if (!reference) throw new Error('Reference label is required');
     if (!Array.isArray(items) || items.length === 0) throw new Error('Items required');
     const now = new Date().toISOString();
     const result = this.db.prepare(`
-      INSERT INTO held_orders (reference, customer_name, items_json, total, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(reference, customerName || null, JSON.stringify(items), Number(total) || 0, notes || null, now);
-    return { id: Number(result.lastInsertRowid), reference, total, created_at: now };
+      INSERT INTO held_orders (reference, customer_name, items_json, total, notes, discount, discount_type, discount_rate, discount_reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      reference,
+      customerName || null,
+      JSON.stringify(items),
+      Number(total) || 0,
+      notes || null,
+      Number(discount) || 0,
+      discountType,
+      Number(discountRate) || 0,
+      discountReason,
+      now
+    );
+    return { id: Number(result.lastInsertRowid), reference, total, discount, discountType, discountRate, discountReason, created_at: now };
   }
 
   deleteHeldOrder(id) {

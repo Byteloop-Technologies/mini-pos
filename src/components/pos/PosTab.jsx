@@ -6,6 +6,7 @@ import ReceiptModal from './ReceiptModal';
 import HeldOrdersModal from './HeldOrdersModal';
 import AddCreditModal from '../customers/AddCreditModal';
 import PayLoanModal from '../customers/PayLoanModal';
+import DiscountModal from './DiscountModal';
 import { printThermalBill } from '../../utils/thermalPrinter';
 
 export default function PosTab({ products, customers, onRefreshProducts, onSaleCompleted }) {
@@ -18,7 +19,16 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
     clearCart,
     loadHeldOrder,
     cartCount,
+    rawSubtotal,
+    itemDiscountsTotal,
     subtotal,
+    discountedSubtotal,
+    discount,
+    cartDiscountAmount,
+    totalDiscount,
+    discountState,
+    applyDiscount,
+    removeDiscount,
     taxRate,
     taxAmount,
     total,
@@ -37,6 +47,10 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
   const [cashReceived, setCashReceived] = useState('');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [completedSale, setCompletedSale] = useState(null);
+
+  // Discount modal state
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountTargetItem, setDiscountTargetItem] = useState(null);
 
   // Held orders state
   const [heldOrders, setHeldOrders] = useState([]);
@@ -188,8 +202,16 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
     try {
       const salePayload = {
         paymentMethod,
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          discount: i.discount || 0,
+        })),
         taxRate,
+        discount: totalDiscount,
+        discountType: discountState.type,
+        discountRate: discountState.value,
+        discountReason: discountState.reason || null,
         customerId: selectedCustomer?.id || null,
         customerName: selectedCustomer?.name || null,
         notes: notes || null,
@@ -206,6 +228,8 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
       // Prepare completed sale object
       const saleReceiptData = {
         ...result,
+        discount: totalDiscount,
+        discount_reason: discountState.reason || null,
         cashReceived: paymentMethod === 'cash' ? cashNum : null,
         changeDue: paymentMethod === 'cash' ? Math.max(0, changeValue) : null,
       };
@@ -244,6 +268,8 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
       id: `EST-${Math.floor(1000 + Math.random() * 9000)}`,
       items,
       subtotal,
+      discount: totalDiscount,
+      discount_reason: discountState.reason || null,
       tax: taxAmount,
       total,
       customer_name: selectedCustomer?.name || 'Walk-in',
@@ -263,6 +289,10 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
         items,
         total,
         notes,
+        discount: totalDiscount,
+        discountType: discountState.type,
+        discountRate: discountState.value,
+        discountReason: discountState.reason || null,
       });
       clearCart();
       setShowParkPrompt(false);
@@ -568,57 +598,148 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
                 <div className="cart-empty-hint">Click products or scan barcode to add</div>
               </div>
             ) : (
-              items.map((item) => (
-                <div key={item.productId} className="cart-item" role="listitem">
-                  <div className="cart-item-info">
-                    <div className="cart-item-name">{item.name}</div>
-                    <div className="cart-item-price">{formatCurrency(item.price)} each</div>
-                  </div>
-                  <div className="cart-item-controls">
+              items.map((item) => {
+                const lineGross = item.price * item.quantity;
+                const lineNet = Math.max(0, lineGross - (item.discount || 0));
+                const hasItemDiscount = Number(item.discount || 0) > 0;
+
+                return (
+                  <div key={item.productId} className="cart-item" role="listitem">
+                    <div className="cart-item-info">
+                      <div className="cart-item-name">{item.name}</div>
+                      <div className="cart-item-price">
+                        {formatCurrency(item.price)} each
+                        {hasItemDiscount && (
+                          <span style={{ color: 'var(--success)', marginLeft: '4px', fontSize: '0.6875rem' }}>
+                            (-{formatCurrency(item.discount)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="cart-item-controls">
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                        aria-label="Decrease quantity"
+                      >
+                        −
+                      </button>
+                      <span className="qty-value">{item.quantity}</span>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${hasItemDiscount ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ padding: '2px 5px', fontSize: '0.625rem', height: '24px' }}
+                        onClick={() => {
+                          setDiscountTargetItem(item);
+                          setShowDiscountModal(true);
+                        }}
+                        title="Apply line item discount"
+                      >
+                        {hasItemDiscount ? `-%` : '% Disc'}
+                      </button>
+                    </div>
+                    <div className="cart-item-total">
+                      {hasItemDiscount ? (
+                        <>
+                          <div style={{ fontSize: '0.6875rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                            {formatCurrency(lineGross)}
+                          </div>
+                          <div>{formatCurrency(lineNet)}</div>
+                        </>
+                      ) : (
+                        formatCurrency(lineGross)
+                      )}
+                    </div>
                     <button
                       type="button"
-                      className="qty-btn"
-                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      aria-label="Decrease quantity"
+                      className="remove-btn"
+                      onClick={() => removeItem(item.productId)}
+                      aria-label="Remove item"
                     >
-                      −
-                    </button>
-                    <span className="qty-value">{item.quantity}</span>
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      aria-label="Increase quantity"
-                    >
-                      +
+                      &times;
                     </button>
                   </div>
-                  <div className="cart-item-total">
-                    {formatCurrency(item.price * item.quantity)}
-                  </div>
-                  <button
-                    type="button"
-                    className="remove-btn"
-                    onClick={() => removeItem(item.productId)}
-                    aria-label="Remove item"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
           <div className="cart-divider" />
 
-          {/* Cart Summary */}
+          {/* Cart Summary with Full Discount Module */}
           <div className="cart-summary">
             <div className="summary-row">
               <span className="summary-label">Subtotal</span>
               <span className="summary-value" id="subtotal">
-                {formatCurrency(subtotal)}
+                {formatCurrency(rawSubtotal || subtotal)}
               </span>
             </div>
+
+            {itemDiscountsTotal > 0 && (
+              <div className="summary-row" style={{ fontSize: '0.75rem', color: 'var(--success)' }}>
+                <span className="summary-label">Item Discounts</span>
+                <span className="summary-value">-{formatCurrency(itemDiscountsTotal)}</span>
+              </div>
+            )}
+
+            {/* Cart / Order Level Discount */}
+            {cartDiscountAmount > 0 ? (
+              <div className="summary-row" style={{ color: 'var(--success)' }}>
+                <span className="summary-label">
+                  Order Discount {discountState.reason ? `(${discountState.reason})` : ''}
+                </span>
+                <span className="summary-value" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <strong>-{formatCurrency(cartDiscountAmount)}</strong>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '1px 5px', fontSize: '0.625rem' }}
+                    onClick={() => {
+                      setDiscountTargetItem(null);
+                      setShowDiscountModal(true);
+                    }}
+                    title="Edit discount"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '1px 5px', fontSize: '0.625rem', color: 'var(--danger)' }}
+                    onClick={removeDiscount}
+                    title="Remove discount"
+                  >
+                    &times;
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '2px 0' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.6875rem', padding: '2px 8px' }}
+                  onClick={() => {
+                    setDiscountTargetItem(null);
+                    setShowDiscountModal(true);
+                  }}
+                  disabled={items.length === 0}
+                  title="Add coupon, promo code, or percentage discount"
+                >
+                  + Add Discount / Promo
+                </button>
+              </div>
+            )}
+
             <div className="summary-row">
               <span className="summary-label">
                 {settings.tax_name} ({taxRate}%)
@@ -893,6 +1014,17 @@ export default function PosTab({ products, customers, onRefreshProducts, onSaleC
             </div>
           </div>
         </div>
+      )}
+
+      {/* Discount & Promo Modal */}
+      {showDiscountModal && (
+        <DiscountModal
+          targetItem={discountTargetItem}
+          onClose={() => {
+            setShowDiscountModal(false);
+            setDiscountTargetItem(null);
+          }}
+        />
       )}
 
       {/* Held Orders List Modal */}

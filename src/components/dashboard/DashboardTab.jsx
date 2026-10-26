@@ -95,6 +95,17 @@ export default function DashboardTab({ stats, lowStockProducts, onQuickRestock }
             </span>
           </div>
         </div>
+
+        {/* Promotional Discounts Granted KPI */}
+        <div className="stat-card info" style={{ gridColumn: 'span 2' }}>
+          <div className="stat-icon" aria-hidden="true" style={{ fontSize: '0.875rem', fontWeight: 700 }}>
+            DISC
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{formatCurrency(stats?.todayDiscounts ?? 0)}</span>
+            <span className="stat-label">Today's Discounts & Promotional Savings</span>
+          </div>
+        </div>
       </div>
 
       <div className="chart-section">

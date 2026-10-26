@@ -11,6 +11,7 @@ export default function SalesTab({ sales, onRefresh }) {
   const [refundReason, setRefundReason] = useState('Customer return');
   const [filterMethod, setFilterMethod] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterDiscount, setFilterDiscount] = useState('all');
 
   const filtered = useMemo(() => {
     return sales.filter((s) => {
@@ -18,9 +19,33 @@ export default function SalesTab({ sales, onRefresh }) {
       const matchStatus =
         filterStatus === 'all' ||
         (filterStatus === 'refunded' ? s.status === 'refunded' : s.status !== 'refunded');
-      return matchMethod && matchStatus;
+      const matchDiscount =
+        filterDiscount === 'all' ||
+        (filterDiscount === 'discounted' ? Number(s.discount || 0) > 0 : Number(s.discount || 0) === 0);
+      return matchMethod && matchStatus && matchDiscount;
     });
-  }, [sales, filterMethod, filterStatus]);
+  }, [sales, filterMethod, filterStatus, filterDiscount]);
+
+  // Overall statistics
+  const summary = useMemo(() => {
+    let completedRevenue = 0;
+    let totalDiscountGranted = 0;
+    let completedOrders = 0;
+
+    for (const s of sales) {
+      if (s.status !== 'refunded') {
+        completedRevenue += Number(s.total || 0);
+        totalDiscountGranted += Number(s.discount || 0);
+        completedOrders += 1;
+      }
+    }
+
+    return {
+      completedRevenue,
+      totalDiscountGranted,
+      completedOrders,
+    };
+  }, [sales]);
 
   const handleProcessRefund = async () => {
     if (!refundSale) return;
@@ -38,10 +63,10 @@ export default function SalesTab({ sales, onRefresh }) {
     <>
       <div className="panel-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h2>Sales History</h2>
+          <h2>Sales History & Promotions</h2>
           <span className="stat-item">{sales.length} transactions</span>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <select
             value={filterMethod}
             onChange={(e) => setFilterMethod(e.target.value)}
@@ -51,6 +76,7 @@ export default function SalesTab({ sales, onRefresh }) {
             <option value="cash">Cash</option>
             <option value="card">Card</option>
             <option value="mobile">Mobile</option>
+            <option value="credit">Store Loan (Credit)</option>
           </select>
           <select
             value={filterStatus}
@@ -61,6 +87,105 @@ export default function SalesTab({ sales, onRefresh }) {
             <option value="completed">Completed</option>
             <option value="refunded">Refunded</option>
           </select>
+          <select
+            value={filterDiscount}
+            onChange={(e) => setFilterDiscount(e.target.value)}
+            style={{ padding: '6px 10px', fontSize: '0.8125rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}
+          >
+            <option value="all">All Sales (Discount & Normal)</option>
+            <option value="discounted">Discounted Sales Only</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Promotional & Revenue KPI Summary Banner */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          <span style={{ fontSize: '0.6875rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+            Total Sales Revenue
+          </span>
+          <div
+            style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              fontFamily: 'var(--font-data)',
+              color: 'var(--text)',
+              marginTop: '2px',
+            }}
+          >
+            {formatCurrency(summary.completedRevenue)}
+          </div>
+          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+            Net received from {summary.completedOrders} orders
+          </span>
+        </div>
+
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          <span style={{ fontSize: '0.6875rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+            Promotional Discounts Given
+          </span>
+          <div
+            style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              fontFamily: 'var(--font-data)',
+              color: 'var(--success)',
+              marginTop: '2px',
+            }}
+          >
+            {formatCurrency(summary.totalDiscountGranted)}
+          </div>
+          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+            Total savings granted to customers
+          </span>
+        </div>
+
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          <span style={{ fontSize: '0.6875rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+            Filtered Results
+          </span>
+          <div
+            style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              fontFamily: 'var(--font-data)',
+              color: 'var(--accent)',
+              marginTop: '2px',
+            }}
+          >
+            {filtered.length} Transactions
+          </div>
+          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+            Matching active filters
+          </span>
         </div>
       </div>
 
@@ -72,6 +197,8 @@ export default function SalesTab({ sales, onRefresh }) {
                 <th>ID</th>
                 <th>Date</th>
                 <th style={{ textAlign: 'right' }}>Items</th>
+                <th style={{ textAlign: 'right' }}>Subtotal</th>
+                <th style={{ textAlign: 'right' }}>Discount</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
                 <th>Payment</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -80,7 +207,7 @@ export default function SalesTab({ sales, onRefresh }) {
             <tbody id="salesTableBody">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
                     No sales recorded
                   </td>
                 </tr>
@@ -89,6 +216,7 @@ export default function SalesTab({ sales, onRefresh }) {
                   const isRefunded = sale.status === 'refunded';
                   const dateStr = new Date(sale.created_at).toLocaleString();
                   const totalItems = sale.items?.reduce((sum, i) => sum + i.quantity, 0) || 0;
+                  const discountAmt = Number(sale.discount || 0);
 
                   return (
                     <tr key={sale.id} style={{ opacity: isRefunded ? 0.75 : 1 }}>
@@ -101,15 +229,34 @@ export default function SalesTab({ sales, onRefresh }) {
                         )}
                       </td>
                       <td style={{ fontSize: '0.8125rem' }}>{dateStr}</td>
-                      <td>{totalItems}</td>
-                      <td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-data)' }}>{totalItems}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-data)', color: 'var(--text-muted)' }}>
+                        {formatCurrency(sale.subtotal || sale.total)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {discountAmt > 0 ? (
+                          <div>
+                            <span className="stock-badge ok" style={{ fontSize: '0.6875rem', fontWeight: 700 }}>
+                              -{formatCurrency(discountAmt)}
+                            </span>
+                            {sale.discount_reason && (
+                              <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {sale.discount_reason}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-data)' }}>
                         <strong style={{ textDecoration: isRefunded ? 'line-through' : 'none' }}>
                           {formatCurrency(sale.total)}
                         </strong>
                       </td>
                       <td>
                         <span className="stock-badge ok" style={{ textTransform: 'uppercase' }}>
-                          {sale.payment_method}
+                          {sale.payment_method === 'credit' ? 'STORE LOAN' : sale.payment_method}
                         </span>
                         {sale.customer_name && (
                           <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
@@ -216,8 +363,13 @@ export default function SalesTab({ sales, onRefresh }) {
                 <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
                   Subtotal: {formatCurrency(selectedSale.subtotal || (selectedSale.total / 1.08))}
                 </div>
+                {Number(selectedSale.discount || 0) > 0 && (
+                  <div style={{ fontSize: '0.875rem', color: 'var(--success)', marginBottom: '4px' }}>
+                    Discount {selectedSale.discount_reason ? `(${selectedSale.discount_reason})` : ''}: -{formatCurrency(selectedSale.discount)}
+                  </div>
+                )}
                 <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  Tax ({settings.tax_rate}%): {formatCurrency(selectedSale.tax || (selectedSale.total - (selectedSale.total / 1.08)))}
+                  Tax ({settings.tax_rate}%): {formatCurrency(selectedSale.tax || 0)}
                 </div>
                 <div>
                   Total: <strong>{formatCurrency(selectedSale.total)}</strong>
@@ -246,7 +398,7 @@ export default function SalesTab({ sales, onRefresh }) {
         </div>
       )}
 
-      {/* Thermal Receipt / Bill Modal */}
+      {/* Thermal Print Modal */}
       {printBillSale && (
         <ReceiptModal
           sale={printBillSale}
@@ -259,22 +411,24 @@ export default function SalesTab({ sales, onRefresh }) {
         <div className="modal-overlay active" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal-header">
-              <h3>Process Refund for Sale #{refundSale.id}</h3>
+              <h3>Process Refund: Sale #{refundSale.id}</h3>
               <button className="modal-close" onClick={() => setRefundSale(null)}>
                 &times;
               </button>
             </div>
             <div className="modal-body">
-              <p style={{ marginBottom: '16px' }}>
-                Refunding will restore all {refundSale.items?.reduce((s, i) => s + i.quantity, 0)} item(s) back into stock and mark the invoice as refunded.
+              <p style={{ marginBottom: '12px' }}>
+                Refunding this order will reverse <strong>{formatCurrency(refundSale.total)}</strong>, restore inventory stock, and update customer balances accordingly.
               </p>
               <div className="form-group">
                 <label>Refund Reason</label>
                 <input
                   type="text"
+                  required
                   value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
-                  placeholder="e.g. Defective item, customer return"
+                  placeholder="e.g. Defective item, customer changed mind"
+                  autoFocus
                 />
               </div>
             </div>
@@ -288,7 +442,8 @@ export default function SalesTab({ sales, onRefresh }) {
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
+                className="btn btn-primary"
+                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
                 onClick={handleProcessRefund}
               >
                 Confirm Refund

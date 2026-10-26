@@ -134,8 +134,8 @@ export default function ReceiptModal({ sale, onClose }) {
                 <span>{formatCurrency(sale.subtotal ?? (sale.total / 1.08))}</span>
               </div>
               {sale.discount > 0 && (
-                <div className="receipt-total-line">
-                  <span>Discount:</span>
+                <div className="receipt-total-line" style={{ color: 'var(--success)' }}>
+                  <span>{sale.discount_reason || sale.discountReason ? `Discount (${sale.discount_reason || sale.discountReason}):` : 'Discount:'}</span>
                   <span>-{formatCurrency(sale.discount)}</span>
                 </div>
               )}

@@ -414,5 +414,62 @@ test('handles shop owner giving items on loan and customer repaying debt after p
   assert.equal(txs[2].amount, -43.2);
 });
 
+test('handles discount module with percentage and fixed discounts on sales', t => {
+  const { directory, database } = createTestDatabase();
+  t.after(() => {
+    database.close();
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  const p1 = database.createProduct({ name: 'Headphones', price: 100, cost_price: 40, stock: 10 });
+
+  // Sale with 10% discount ($10 off subtotal of $100, tax 8% on $90 = $7.20, total = $97.20)
+  const sale = database.createSale({
+    paymentMethod: 'cash',
+    items: [{ productId: p1.id, quantity: 1 }],
+    discount: 10,
+    discountType: 'percentage',
+    discountRate: 10,
+    discountReason: 'VIP Customer 10%',
+    taxRate: 8,
+  });
+
+  assert.equal(sale.subtotal, 100);
+  assert.equal(sale.discount, 10);
+  assert.equal(sale.discount_type, 'percentage');
+  assert.equal(sale.discount_rate, 10);
+  assert.equal(sale.discount_reason, 'VIP Customer 10%');
+  assert.equal(sale.tax, 7.2);
+  assert.equal(sale.total, 97.2);
+
+  // Check stats reflect discount
+  const stats = database.getStats();
+  assert.equal(stats.todayDiscounts, 10);
+  assert.equal(stats.allTimeDiscounts, 10);
+  // Revenue 97.20, Cost 40, profit = (100 - 40) - 10 = 50
+  assert.equal(stats.todayGrossProfit, 50);
+
+  // Check sales record retrieval includes discount details
+  const retrievedSale = database.getSaleById(sale.id);
+  assert.equal(retrievedSale.discount, 10);
+  assert.equal(retrievedSale.discount_reason, 'VIP Customer 10%');
+
+  // Verify held order with discount preserves discount metadata
+  const held = database.saveHeldOrder({
+    reference: 'HOLD-DISC-1',
+    customerName: 'Alice',
+    items: [{ productId: p1.id, quantity: 1, price: 100 }],
+    total: 97.2,
+    discount: 10,
+    discountType: 'percentage',
+    discountRate: 10,
+    discountReason: 'Staff Promo',
+  });
+  assert.equal(held.discount, 10);
+  assert.equal(held.discountType, 'percentage');
+  assert.equal(held.discountReason, 'Staff Promo');
+});
+
+
 
 

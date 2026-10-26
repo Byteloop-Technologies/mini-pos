@@ -302,6 +302,46 @@ export default function SettingsTab({ products, sales }) {
             </div>
           </div>
 
+          {/* Discount & Promotions Controls */}
+          <div className="section">
+            <div className="section-header">
+              <h3 className="section-title">Discounts & Promotion Controls</h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Cashier permissions, discount thresholds, and standard presets
+              </span>
+            </div>
+            <div className="section-content">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Maximum Allowed Discount (%)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="100"
+                    required
+                    placeholder="50"
+                    value={formData.max_discount_percent ?? '50'}
+                    onChange={(e) => setFormData({ ...formData, max_discount_percent: e.target.value })}
+                  />
+                  <span className="form-help">Maximum discount rate cashier can apply without manager approval</span>
+                </div>
+                <div className="form-group">
+                  <label>Active Promo Codes & Presets</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    <span className="stock-badge info">MEMBER5 (5%)</span>
+                    <span className="stock-badge info">SAVE10 (10%)</span>
+                    <span className="stock-badge info">STAFF15 (15%)</span>
+                    <span className="stock-badge info">CLEAR20 (20%)</span>
+                    <span className="stock-badge info">VIP25 (25%)</span>
+                    <span className="stock-badge info">VOUCHER5 ($5)</span>
+                  </div>
+                  <span className="form-help">Available for one-click selection or promo code entry in POS</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Business & Store Profile */}
           <div className="section">
             <div className="section-header">
