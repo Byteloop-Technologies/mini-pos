@@ -17,7 +17,7 @@ const CURRENCY_PRESETS = [
 ];
 
 export default function SettingsTab({ products, sales }) {
-  const { settings, updateSettings, formatCurrency } = useSettings();
+  const { settings, updateSettings, formatCurrency, currentTheme, setTheme, themes } = useSettings();
   const [formData, setFormData] = useState({ ...settings });
   const [saveStatus, setSaveStatus] = useState('');
   const [printers, setPrinters] = useState([]);
@@ -170,6 +170,90 @@ export default function SettingsTab({ products, sales }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '4px' }}>
         <form onSubmit={handleSave} style={{ maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* UI Themes & Visual Atmosphere Section */}
+          <div className="section">
+            <div className="section-header">
+              <h3 className="section-title">UI Theme & Atmosphere</h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Select from 5 purpose-built minimal ERP themes for retail, grocery, and office environments
+              </span>
+            </div>
+            <div className="section-content">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gap: '12px',
+                }}
+              >
+                {(themes || []).map((t) => {
+                  const isActive = currentTheme === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      style={{
+                        padding: '14px',
+                        background: 'var(--bg-card)',
+                        border: `2px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        transition: 'border-color 150ms ease, transform 150ms ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <strong style={{ fontSize: '0.9375rem' }}>{t.name}</strong>
+                          <span className={`stock-badge ${isActive ? 'ok' : 'info'}`} style={{ fontSize: '0.625rem' }}>
+                            {isActive ? 'ACTIVE' : t.tag}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 }}>
+                          {t.desc}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                        {/* Swatches preview */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {t.swatches.map((color, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '3px',
+                                background: color,
+                                border: '1px solid rgba(0,0,0,0.15)',
+                                display: 'inline-block',
+                              }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '2px 8px', fontSize: '0.6875rem' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTheme(t.id);
+                          }}
+                        >
+                          {isActive ? 'Current' : 'Select'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* Currency Configuration Section */}
           <div className="section">
             <div className="section-header">

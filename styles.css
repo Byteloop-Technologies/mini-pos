@@ -1,28 +1,29 @@
-:root {
+:root,
+[data-theme="slate"] {
   --bg: #f5f6f8;
   --bg-card: #ffffff;
   --bg-muted: #f8f9fb;
   --bg-hover: #eef0f3;
   --border: #dce0e6;
   --border-strong: #b8c0cc;
-  --text: #202632;
-  --text-muted: #596475;
-  --text-light: #687385;
-  --primary: #202632;
-  --primary-hover: #353e4e;
+  --text: #1e2530;
+  --text-muted: #556274;
+  --text-light: #6a778c;
+  --primary: #1e2530;
+  --primary-hover: #343f52;
   --primary-light: #eef0f3;
   --on-primary: #ffffff;
-  /* Solid contrast against white / own tint / page (WCAG). */
-  --success: #146b43; /* 6.46 / 5.77 / 5.97 */
+  --accent: #1e2530;
+  --success: #146b43;
   --success-light: #eaf5ee;
   --success-border: #a9d3ba;
-  --warning: #8a4b08; /* 6.82 / 6.28 / 6.30 */
+  --warning: #8a4b08;
   --warning-light: #fff4e5;
   --warning-border: #e5c393;
-  --danger: #b42332; /* 6.54 / 5.88 / 6.04 */
+  --danger: #b42332;
   --danger-light: #fdeef0;
   --danger-border: #e6aeb7;
-  --info: #235c9e; /* 6.75 / 6.07 / 6.24 */
+  --info: #235c9e;
   --info-light: #edf3fc;
   --info-border: #acc6e6;
   --shadow-float: 0 12px 36px rgba(15, 23, 42, 0.18);
@@ -42,34 +43,128 @@
   --font-data: 'JetBrains Mono', Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141820;
-    --bg-card: #1e2430;
-    --bg-muted: #242c39;
-    --bg-hover: #2c3544;
-    --border: #384354;
-    --border-strong: #55647a;
-    --text: #edf0f5;
-    --text-muted: #b7c1d0;
-    --text-light: #a7b4c6;
-    --primary: #edf0f5;
-    --primary-hover: #cdd5e1;
-    --primary-light: #2c3544;
-    --on-primary: #1e2430;
-    --success: #8fdfb1;
-    --success-light: #19372a;
-    --success-border: #3f7156;
-    --warning: #f3c383;
-    --warning-light: #3c2c1b;
-    --warning-border: #82623b;
-    --danger: #f5a4ae;
-    --danger-light: #40242b;
-    --danger-border: #85505b;
-    --info: #a4caff;
-    --info-light: #22344b;
-    --info-border: #49698e;
-  }
+/* Theme 2: Obsidian Dark / Night Shift */
+[data-theme="dark"] {
+  --bg: #0f1319;
+  --bg-card: #181d26;
+  --bg-muted: #1f2633;
+  --bg-hover: #273040;
+  --border: #2c3647;
+  --border-strong: #45556f;
+  --text: #f1f4f9;
+  --text-muted: #9aa8bd;
+  --text-light: #8391a6;
+  --primary: #f1f4f9;
+  --primary-hover: #dbe2ed;
+  --primary-light: #273040;
+  --on-primary: #0f1319;
+  --accent: #60a5fa;
+  --success: #4ade80;
+  --success-light: #064e3b;
+  --success-border: #047857;
+  --warning: #fbbf24;
+  --warning-light: #451a03;
+  --warning-border: #92400e;
+  --danger: #f87171;
+  --danger-light: #450a0a;
+  --danger-border: #991b1b;
+  --info: #93c5fd;
+  --info-light: #172554;
+  --info-border: #1e40af;
+  --shadow-float: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+/* Theme 3: Nordic Navy / Executive Corporate */
+[data-theme="navy"] {
+  --bg: #eef3f8;
+  --bg-card: #ffffff;
+  --bg-muted: #e4ecf5;
+  --bg-hover: #d8e4f0;
+  --border: #c6d6e5;
+  --border-strong: #96b2ce;
+  --text: #0d2238;
+  --text-muted: #3f5b77;
+  --text-light: #5d7894;
+  --primary: #0d3559;
+  --primary-hover: #07223b;
+  --primary-light: #e4ecf5;
+  --on-primary: #ffffff;
+  --accent: #0f4c81;
+  --success: #0b6941;
+  --success-light: #e6f6ee;
+  --success-border: #98d8ba;
+  --warning: #8d4f07;
+  --warning-light: #fff5e6;
+  --warning-border: #e6c594;
+  --danger: #b32031;
+  --danger-light: #fdebed;
+  --danger-border: #e99da8;
+  --info: #1360ab;
+  --info-light: #e8f2fa;
+  --info-border: #9bc3ea;
+  --shadow-float: 0 12px 36px rgba(14, 53, 92, 0.16);
+}
+
+/* Theme 4: Emerald Botanical / Fresh Market */
+[data-theme="emerald"] {
+  --bg: #f2f7f4;
+  --bg-card: #ffffff;
+  --bg-muted: #e5f0e8;
+  --bg-hover: #d7e7db;
+  --border: #c3d9c7;
+  --border-strong: #8fb696;
+  --text: #11281a;
+  --text-muted: #3d5d47;
+  --text-light: #577861;
+  --primary: #15472b;
+  --primary-hover: #0e301d;
+  --primary-light: #e5f0e8;
+  --on-primary: #ffffff;
+  --accent: #15472b;
+  --success: #15803d;
+  --success-light: #e7f7ed;
+  --success-border: #9addb2;
+  --warning: #87500b;
+  --warning-light: #fff5e6;
+  --warning-border: #e7c798;
+  --danger: #b3212f;
+  --danger-light: #fdebee;
+  --danger-border: #e99fa7;
+  --info: #166596;
+  --info-light: #e7f3f9;
+  --info-border: #95c8e4;
+  --shadow-float: 0 12px 36px rgba(22, 70, 44, 0.16);
+}
+
+/* Theme 5: Amber Industrial / Boutique Concept */
+[data-theme="amber"] {
+  --bg: #f8f6f2;
+  --bg-card: #ffffff;
+  --bg-muted: #eee9df;
+  --bg-hover: #e2dbce;
+  --border: #dad2c3;
+  --border-strong: #afa48f;
+  --text: #28241e;
+  --text-muted: #5e574c;
+  --text-light: #736b5e;
+  --primary: #2d261e;
+  --primary-hover: #483d30;
+  --primary-light: #eee9df;
+  --on-primary: #ffffff;
+  --accent: #92530c;
+  --success: #1b6d3e;
+  --success-light: #eaf5ee;
+  --success-border: #a4d5b6;
+  --warning: #945307;
+  --warning-light: #fff5e6;
+  --warning-border: #e6c592;
+  --danger: #b32525;
+  --danger-light: #fdeeed;
+  --danger-border: #e7a3a3;
+  --info: #27598c;
+  --info-light: #ecf3fa;
+  --info-border: #a4c4e5;
+  --shadow-float: 0 12px 36px rgba(45, 38, 30, 0.16);
 }
 
 *, *::before, *::after { box-sizing: border-box; }

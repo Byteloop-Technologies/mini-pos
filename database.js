@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS = {
   receipt_header: 'TAX INVOICE / RECEIPT',
   receipt_footer: 'Thank you for your business. Please retain receipt for returns.',
   low_stock_threshold: '5',
+  ui_theme: 'slate',
   max_discount_percent: '50',
   discount_presets: JSON.stringify([
     { name: 'Member Discount', type: 'percentage', value: 5, code: 'MEMBER5' },
